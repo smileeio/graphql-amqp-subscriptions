@@ -8,7 +8,8 @@
   "exclude": [
     "**/*.d.ts",
     "**/*.test.ts",
-    "test/*.ts"
+    "test/*.ts",
+    ".history"
   ],
   "require": [
     "ts-node/register"

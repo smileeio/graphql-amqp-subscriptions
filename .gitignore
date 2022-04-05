@@ -36,3 +36,5 @@ jsdoc
 
 # MAC specific files
 .DS_Store
+
+.history

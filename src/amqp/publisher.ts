@@ -1,12 +1,13 @@
 import amqp from 'amqplib';
 import Debug from 'debug';
+import * as BluebirdPromise from 'bluebird';
 
 import { PubSubAMQPConfig, Exchange } from './interfaces';
 
 export class AMQPPublisher {
   private connection: amqp.Connection;
   private exchange: Exchange;
-  private channel: amqp.Channel | null = null;
+  private channel: BluebirdPromise<amqp.Channel> | null = null;
 
   constructor(
     config: PubSubAMQPConfig,
@@ -33,8 +34,11 @@ export class AMQPPublisher {
 
   private async getOrCreateChannel(): Promise<amqp.Channel> {
     if (!this.channel) {
-      this.channel = await this.connection.createChannel();
-      this.channel.on('error', (err) => { this.logger('Publisher channel error: "%j"', err); });
+      this.channel = this.connection.createChannel();
+      this.channel.then(ch => {
+        ch.on('error', (err) => { this.logger('Publisher channel error: "%j"', err); });
+        /* tslint:disable */
+      }).catch(() => {});
     }
     return this.channel;
   }

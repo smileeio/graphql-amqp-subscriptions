@@ -1,16 +1,15 @@
-import { PubSubEngine } from 'graphql-subscriptions';
 import amqp from 'amqplib';
 import Debug from 'debug';
 import { v4 as uuidv4 } from 'uuid';
 
 import { AMQPPublisher } from './amqp/publisher';
 import { AMQPSubscriber } from './amqp/subscriber';
-import { Exchange, PubSubAMQPConfig } from './amqp/interfaces';
+import { AMQPPubSubEngine, Exchange, PubSubAMQPConfig, SubscribeOptions } from './amqp/interfaces';
 import { PubSubAsyncIterator } from './pubsub-async-iterator';
 
 const logger = Debug('AMQPPubSub');
 
-export class AMQPPubSub implements PubSubEngine {
+export class AMQPPubSub implements AMQPPubSubEngine {
   private publisher: AMQPPublisher;
   private subscriber: AMQPSubscriber;
   private exchange: Exchange;
@@ -53,8 +52,7 @@ export class AMQPPubSub implements PubSubEngine {
   public async subscribe(
     routingKey: string | 'fanout',
     onMessage: (content: any, message?: amqp.ConsumeMessage | null) => void,
-    args?: any,
-    options?: amqp.Options.Consume
+    options?: SubscribeOptions
   ): Promise<number> {
     const id = this.currentSubscriptionId++;
 
@@ -83,7 +81,7 @@ export class AMQPPubSub implements PubSubEngine {
     const existingDispose = this.unsubscribeMap[routingKey];
     // Get rid of exisiting subscription while we get a new one.
     const [newDispose] = await Promise.all([
-      this.subscriber.subscribe(routingKey, this.onMessage, args, options),
+      this.subscriber.subscribe(routingKey, this.onMessage, options),
       existingDispose ? existingDispose() : Promise.resolve()
     ]);
 
@@ -118,8 +116,8 @@ export class AMQPPubSub implements PubSubEngine {
     delete this.subscriptionMap[subId];
   }
 
-  public asyncIterator<T>(triggers: string | string[]): AsyncIterator<T> {
-    return new PubSubAsyncIterator<T>(this, triggers);
+  public asyncIterator<T>(triggers: string | string[], options?: SubscribeOptions): AsyncIterator<T> {
+    return new PubSubAsyncIterator<T>(this, triggers, options);
   }
 
   private onMessage = (routingKey: string, content: any, message: amqp.ConsumeMessage | null): void => {

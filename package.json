@@ -1,16 +1,13 @@
 {
-  "name": "graphql-amqp-subscriptions",
+  "name": "@smileeio/graphql-amqp-subscriptions",
   "description": "GraphQL AMQP Subscriptions",
-  "version": "1.2.0",
+  "version": "1.2.0-smileeio-v1",
   "author": "https://github.com/Surnet/graphql-amqp-subscriptions/graphs/contributors",
   "license": "MIT",
-  "homepage": "https://github.com/Surnet/graphql-amqp-subscriptions",
-  "bugs": {
-    "url": "https://github.com/Surnet/graphql-amqp-subscriptions/issues"
-  },
+  "homepage": "https://github.com/smileeio/graphql-amqp-subscriptions",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Surnet/graphql-amqp-subscriptions.git"
+    "url": "https://github.com/smileeio/graphql-amqp-subscriptions"
   },
   "engines": {
     "node": ">= 10"
