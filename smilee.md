@@ -1,3 +1,5 @@
+`npm build` has to be run before committing a release.
+
 ### 1.2.0-smileeio-v1
 
 Changes:

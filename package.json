@@ -32,7 +32,8 @@
     "check-updates": "npm outdated",
     "lint": "tslint \"src/**/*.ts\"",
     "test": "TS_NODE_FILES=true TS_NODE_PROJECT=\"./base.tsconfig.json\" nyc mocha",
-    "release": "release-it"
+    "release": "release-it",
+    "postinstall": "npm run build"
   },
   "dependencies": {
     "debug": "4.3.1",
