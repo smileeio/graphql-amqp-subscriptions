@@ -15,13 +15,16 @@ export interface PubSubAMQPConfig {
     exchange?: Exchange;
     queue?: Queue;
 }
+export interface SubscribeQueue extends Queue {
+    name: string;
+}
 export interface SubscribeOptions {
-    queue: Queue;
+    queue: SubscribeQueue;
     consume?: Options.Consume;
 }
 export declare abstract class AMQPPubSubEngine {
     abstract publish(triggerName: string, payload: any): Promise<void>;
-    abstract subscribe(triggerName: string, onMessage: Function, options?: SubscribeOptions): Promise<number>;
-    abstract unsubscribe(subId: number): any;
-    asyncIterator<T>(triggers: string | string[], options?: SubscribeOptions): AsyncIterator<T>;
+    abstract subscribe(triggerName: string, onMessage: Function, options: SubscribeOptions): Promise<number>;
+    abstract unsubscribe(subId: number, queueName: string): any;
+    asyncIterator<T>(triggers: string | string[], options: SubscribeOptions): AsyncIterator<T>;
 }

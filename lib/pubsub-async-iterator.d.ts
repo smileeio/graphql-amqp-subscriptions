@@ -36,8 +36,8 @@ export declare class PubSubAsyncIterator<T> implements AsyncIterator<T> {
     private allSubscribed;
     private listening;
     private pubsub;
-    private options?;
-    constructor(pubsub: AMQPPubSubEngine, eventNames: string | string[], options?: SubscribeOptions);
+    private options;
+    constructor(pubsub: AMQPPubSubEngine, eventNames: string | string[], options: SubscribeOptions);
     next(): Promise<IteratorResult<any, any>>;
     return(): Promise<IteratorResult<any>>;
     throw(err: any): Promise<never>;
