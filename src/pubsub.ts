@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { AMQPPublisher } from './amqp/publisher';
 import { AMQPSubscriber } from './amqp/subscriber';
-import { AMQPPubSubEngine, Exchange, Queue, PubSubAMQPConfig, SubscribeOptions } from './amqp/interfaces';
+import { AMQPPubSubEngine, Exchange, PubSubAMQPConfig, SubscribeOptions } from './amqp/interfaces';
 import { PubSubAsyncIterator } from './pubsub-async-iterator';
 
 const logger = Debug('AMQPPubSub');
@@ -15,8 +15,8 @@ export class AMQPPubSub implements AMQPPubSubEngine {
   private exchange: Exchange;
 
   private subscriptionMap: { [subId: number]: { routingKey: string, listener: Function } };
-  private subsRefsMap: { [queue: string]: { [trigger: string]: Array<number> } };
-  private unsubscribeMap: { [trigger: string]: () => PromiseLike<any> };
+  private subsRefsMap: { [queueName: string]: { [trigger: string]: Array<number> } };
+  private unsubscribeMap: { [queueName: string]: { [trigger: string]: () => PromiseLike<any> } };
   private currentSubscriptionId: number;
 
   constructor(
@@ -81,14 +81,15 @@ export class AMQPPubSub implements AMQPPubSubEngine {
       id
     ];
 
-    const existingDispose = this.unsubscribeMap[routingKey];
+    const existingDispose = this.unsubscribeMap[queueName]?.[routingKey];
     // Get rid of exisiting subscription while we get a new one.
     const [newDispose] = await Promise.all([
       this.subscriber.subscribe(routingKey, this.onMessage.bind(this, queueName), options),
       existingDispose ? existingDispose() : Promise.resolve()
     ]);
 
-    this.unsubscribeMap[routingKey] = newDispose;
+    if (!this.unsubscribeMap[queueName]) { this.unsubscribeMap[queueName] = {}; }
+    this.unsubscribeMap[queueName][routingKey] = newDispose;
     return id;
   }
 
@@ -141,9 +142,12 @@ export class AMQPPubSub implements AMQPPubSubEngine {
   }
 
   private async unsubscribeForKey(queueName: string, routingKey: string): Promise<void> {
-    const dispose = this.unsubscribeMap[routingKey];
-    delete this.unsubscribeMap[routingKey];
-    delete this.subsRefsMap[queueName]?.[routingKey];
+    if (!this.unsubscribeMap[queueName]) { return; }
+    if (!this.unsubscribeMap[queueName][routingKey]) { return; }
+
+    const dispose = this.unsubscribeMap[queueName][routingKey];
+    delete this.unsubscribeMap[queueName][routingKey];
+    delete this.subsRefsMap[queueName][routingKey];
     await dispose();
   }
 
