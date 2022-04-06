@@ -3,12 +3,12 @@ import Debug from 'debug';
 import * as BluebirdPromise from 'bluebird';
 
 import { Common } from './common';
-import { PubSubAMQPConfig, Exchange, Queue, SubscribeOptions } from './interfaces';
+import { PubSubAMQPConfig, Exchange, SubscribeOptions } from './interfaces';
+
 
 export class AMQPSubscriber {
   private connection: amqp.Connection;
   private exchange: Exchange;
-  private queue?: Queue;
   private channel: BluebirdPromise<amqp.Channel> | null = null;
 
   constructor(
@@ -25,34 +25,22 @@ export class AMQPSubscriber {
       },
       ...config.exchange
     };
-
-    if (config.queue) {
-      this.queue = config.queue;
-    }
   }
 
   public async subscribe(
     routingKey: string,
     action: (routingKey: string, content: any, message: amqp.ConsumeMessage | null) => void,
-    options?: SubscribeOptions
+    options: SubscribeOptions
   ): Promise<() => Promise<void>> {
-    const queueOptions: Queue = {
-        options: {
-            exclusive: true,
-            durable: false,
-            autoDelete: true
-        },
-        ...(options && options.queue || this.queue || {})
-    };
     // Create and bind queue
     const channel = await this.getOrCreateChannel();
     await channel.assertExchange(this.exchange.name, this.exchange.type, this.exchange.options);
-    const queue = await channel.assertQueue(queueOptions.name || '', queueOptions.options);
+    const queue = await channel.assertQueue(options.queue.name || '', options.queue.options);
     await channel.bindQueue(
       queue.queue,
       this.exchange.name,
       routingKey,
-      queueOptions.options ? queueOptions.options.arguments : undefined
+      options.queue.options ? options.queue.options.arguments : undefined
     );
 
     // Listen for messages
@@ -68,10 +56,10 @@ export class AMQPSubscriber {
       this.logger('Disposing Subscriber to Queue "%s" (%s)', queue.queue, opts.consumerTag);
       const ch = await this.getOrCreateChannel();
       await ch.cancel(opts.consumerTag);
-      if (queueOptions.unbindOnDispose) {
+      if (options.queue.unbindOnDispose) {
         await ch.unbindQueue(queue.queue, this.exchange.name, routingKey);
       }
-      if (queueOptions.deleteOnDispose) {
+      if (options.queue.deleteOnDispose) {
         await ch.deleteQueue(queue.queue);
       }
     };

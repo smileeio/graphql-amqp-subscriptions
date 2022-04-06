@@ -2,6 +2,7 @@
 import { AMQPPubSub } from './pubsub';
 import { PubSubAMQPConfig } from './amqp/interfaces';
 import { expect } from 'chai';
+import { v4 as uuidv4 } from 'uuid';
 import 'mocha';
 import amqp from 'amqplib';
 import { EventEmitter } from 'events';
@@ -9,30 +10,34 @@ import { EventEmitter } from 'events';
 type TestData = { test: string };
 type TestDataDetail = {
   content: {
-    test: string
-  },
-  message: amqp.ConsumeMessage
+    test: string;
+  };
+  message: amqp.ConsumeMessage;
 };
 
 let pubsub: AMQPPubSub;
 let config: PubSubAMQPConfig;
 
-describe('AMQP PubSub', () => {
+const subscribeOptions = {
+  queue: {
+    options: {
+      exclusive: true,
+      durable: false,
+      autoDelete: true
+    }
+  }
+};
 
+describe('AMQP PubSub', () => {
   before(async () => {
     config = {
-      connection: await amqp.connect('amqp://guest:guest@localhost:5672?heartbeat=30'),
+      connection: await amqp.connect(
+        'amqp://guest:guest@localhost:5672?heartbeat=30'
+      ),
       exchange: {
         name: 'exchange',
         type: 'topic',
         options: {
-          durable: false,
-          autoDelete: true
-        }
-      },
-      queue: {
-        options: {
-          exclusive: true,
           durable: false,
           autoDelete: true
         }
@@ -59,15 +64,24 @@ describe('AMQP PubSub', () => {
 
   it('should be able to receive a message with the appropriate routingKey', async () => {
     const emitter = new EventEmitter();
-    const msgPromise = new Promise<TestData>((resolve) => { emitter.once('message', resolve); });
-
-    const subscriberId = await pubsub.subscribe('testx.*', (message) => {
-      emitter.emit('message', message);
+    const msgPromise = new Promise<TestData>((resolve) => {
+      emitter.once('message', resolve);
     });
+
+    const subscriberId = await pubsub.subscribe(
+      'testx.*',
+      (message) => {
+        emitter.emit('message', message);
+      },
+      {
+        ...subscribeOptions,
+        queue: { ...subscribeOptions.queue, name: uuidv4() }
+      }
+    );
     expect(subscriberId).to.exist;
     expect(isNaN(subscriberId)).to.equal(false);
 
-    await pubsub.publish('testx.test', {test: 'data'});
+    await pubsub.publish('testx.test', { test: 'data' });
     const msg = await msgPromise;
 
     expect(msg).to.exist;
@@ -76,15 +90,28 @@ describe('AMQP PubSub', () => {
 
   it('should be able to receive a raw message with the appropriate routingKey', async () => {
     const emitter = new EventEmitter();
-    const msgPromise = new Promise<TestDataDetail>((resolve) => { emitter.once('message', resolve); });
-
-    const subscriberId = await pubsub.subscribe('testheader.*', (content, message) => {
-      emitter.emit('message', { content, message });
+    const msgPromise = new Promise<TestDataDetail>((resolve) => {
+      emitter.once('message', resolve);
     });
+
+    const subscriberId = await pubsub.subscribe(
+      'testheader.*',
+      (content, message) => {
+        emitter.emit('message', { content, message });
+      },
+      {
+        ...subscribeOptions,
+        queue: { ...subscribeOptions.queue, name: uuidv4() }
+      }
+    );
     expect(subscriberId).to.exist;
     expect(isNaN(subscriberId)).to.equal(false);
 
-    await pubsub.publish('testheader.test', {test: 'data'}, { contentType: 'file', headers: { key: 'value' }});
+    await pubsub.publish(
+      'testheader.test',
+      { test: 'data' },
+      { contentType: 'file', headers: { key: 'value' } }
+    );
     const { content: msg, message: rawMsg } = await msgPromise;
 
     expect(msg).to.exist;
@@ -99,48 +126,73 @@ describe('AMQP PubSub', () => {
   });
 
   it('should be able to unsubscribe', async () => {
-    const emitter = new EventEmitter();
-    const errPromise = new Promise<TestData>((_resolve, reject) => { emitter.once('error', reject); });
+    const options = {
+      ...subscribeOptions,
+      queue: { ...subscribeOptions.queue, name: uuidv4() }
+    };
 
-    const subscriberId = await pubsub.subscribe('test.test', () => {
-      emitter.emit('error', new Error('Should not reach'));
+    const emitter = new EventEmitter();
+    const errPromise = new Promise<TestData>((_resolve, reject) => {
+      emitter.once('error', reject);
     });
+
+    const subscriberId = await pubsub.subscribe(
+      'test.test',
+      () => {
+        emitter.emit('error', new Error('Should not reach'));
+      },
+      options
+    );
 
     expect(subscriberId).to.exist;
     expect(isNaN(subscriberId)).to.equal(false);
 
     return Promise.race([
-      pubsub.unsubscribe(subscriberId),
+      pubsub.unsubscribe(subscriberId, options.queue.name),
       errPromise
     ]);
   });
 
   it('should be able to receive a message after one of two subscribers unsubscribed', async () => {
+    const options = {
+      ...subscribeOptions,
+      queue: { ...subscribeOptions.queue, name: uuidv4() }
+    };
+
     const emitter = new EventEmitter();
-    const errPromise = new Promise<TestData>((_resolve, reject) => { emitter.once('error', reject); });
-    const msgPromise = new Promise<TestData>((resolve) => { emitter.once('message', resolve); });
+    const errPromise = new Promise<TestData>((_resolve, reject) => {
+      emitter.once('error', reject);
+    });
+    const msgPromise = new Promise<TestData>((resolve) => {
+      emitter.once('message', resolve);
+    });
 
     // Subscribe two
-    const id1 = await pubsub.subscribe('testy.test', () => {
-      emitter.emit('error', new Error('Should not reach'));
-    });
+    const id1 = await pubsub.subscribe(
+      'testy.test',
+      () => {
+        emitter.emit('error', new Error('Should not reach'));
+      },
+      options
+    );
     expect(id1).to.exist;
 
-    const id2 = await pubsub.subscribe('testy.test', (message) => {
-      emitter.emit('message', message);
-    });
+    const id2 = await pubsub.subscribe(
+      'testy.test',
+      (message) => {
+        emitter.emit('message', message);
+      },
+      options
+    );
 
     expect(id2).to.exist;
     expect(id1).to.not.equal(id2);
 
     // Unsubscribe one
-    await pubsub.unsubscribe(id1);
+    await pubsub.unsubscribe(id1, options.queue.name);
 
-    await pubsub.publish('testy.test', {test: '1335'});
-    const msg = await Promise.race<TestData>([
-      msgPromise,
-      errPromise
-    ]);
+    await pubsub.publish('testy.test', { test: '1335' });
+    const msg = await Promise.race<TestData>([msgPromise, errPromise]);
 
     // Receive message
     expect(msg).to.exist;
@@ -148,18 +200,35 @@ describe('AMQP PubSub', () => {
   });
 
   it('should be able to receive a message after one of two subscribers unsubscribed (concurrent)', async () => {
+    const options = {
+      ...subscribeOptions,
+      queue: { ...subscribeOptions.queue, name: uuidv4() }
+    };
+
     const emitter = new EventEmitter();
-    const errPromise = new Promise<TestData>((_resolve, reject) => { emitter.once('error', reject); });
-    const msgPromise = new Promise<TestData>((resolve) => { emitter.once('message', resolve); });
+    const errPromise = new Promise<TestData>((_resolve, reject) => {
+      emitter.once('error', reject);
+    });
+    const msgPromise = new Promise<TestData>((resolve) => {
+      emitter.once('message', resolve);
+    });
 
     // Subscribe two
     const [id1, id2] = await Promise.all([
-      pubsub.subscribe('testz.test', () => {
-        emitter.emit('error', new Error('Should not reach'));
-      }),
-      pubsub.subscribe('testz.test', (message) => {
-        emitter.emit('message', message);
-      })
+      pubsub.subscribe(
+        'testz.test',
+        () => {
+          emitter.emit('error', new Error('Should not reach'));
+        },
+        options
+      ),
+      pubsub.subscribe(
+        'testz.test',
+        (message) => {
+          emitter.emit('message', message);
+        },
+        options
+      )
     ]);
 
     expect(id1).to.exist;
@@ -167,13 +236,10 @@ describe('AMQP PubSub', () => {
     expect(id1).to.not.equal(id2);
 
     // Unsubscribe one
-    await pubsub.unsubscribe(id1);
+    await pubsub.unsubscribe(id1, options.queue.name);
 
-    await pubsub.publish('testz.test', {test: '1336'});
-    const msg = await Promise.race<TestData>([
-      msgPromise,
-      errPromise
-    ]);
+    await pubsub.publish('testz.test', { test: '1336' });
+    const msg = await Promise.race<TestData>([msgPromise, errPromise]);
 
     // Receive message
     expect(msg).to.exist;
@@ -181,37 +247,50 @@ describe('AMQP PubSub', () => {
   });
 
   it('should be able to receive a message after an unsubscribe and then an immediate subscribe', async () => {
+    const options = {
+      ...subscribeOptions,
+      queue: { ...subscribeOptions.queue, name: uuidv4() }
+    };
+
     const emitter = new EventEmitter();
-    const errPromise = new Promise<TestData>((_resolve, reject) => { emitter.once('error', reject); });
+    const errPromise = new Promise<TestData>((_resolve, reject) => {
+      emitter.once('error', reject);
+    });
 
     // Subscribe one
-    const id1 = await pubsub.subscribe('testy.test', () => {
-      emitter.emit('error', new Error('Should not reach'));
-    });
+    const id1 = await pubsub.subscribe(
+      'testy.test',
+      () => {
+        emitter.emit('error', new Error('Should not reach'));
+      },
+      options
+    );
     expect(id1).to.exist;
 
-    const msgPromise = new Promise<TestData>((resolve) => { emitter.once('message', resolve); });
+    const msgPromise = new Promise<TestData>((resolve) => {
+      emitter.once('message', resolve);
+    });
 
     // Unsub one, sub while unsub is running
     const [, id2] = await Promise.all([
-      pubsub.unsubscribe(id1),
-      pubsub.subscribe('testy.test', (message) => {
-        emitter.emit('message', message);
-      })
+      pubsub.unsubscribe(id1, options.queue.name),
+      pubsub.subscribe(
+        'testy.test',
+        (message) => {
+          emitter.emit('message', message);
+        },
+        options
+      )
     ]);
 
     expect(id2).to.exist;
     expect(id1).to.not.equal(id2);
 
-    await pubsub.publish('testy.test', {test: '1337'});
-    const msg = await Promise.race<TestData>([
-      msgPromise,
-      errPromise
-    ]);
+    await pubsub.publish('testy.test', { test: '1337' });
+    const msg = await Promise.race<TestData>([msgPromise, errPromise]);
 
     // Receive message
     expect(msg).to.exist;
     expect(msg.test).to.equal('1337');
   });
-
 });

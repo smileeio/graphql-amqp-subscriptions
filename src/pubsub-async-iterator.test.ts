@@ -4,6 +4,7 @@ import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { spy } from 'sinon';
 import sinonChai from 'sinon-chai';
+import { v4 as uuidv4 } from 'uuid';
 
 import { isAsyncIterable } from 'iterall';
 import { AMQPPubSub as PubSub } from './pubsub';
@@ -47,7 +48,7 @@ function buildSchema(iterator: any, filterFn: FilterFn = defaultFilter) {
       fields: {
         testString: {
           type: GraphQLString,
-          resolve: function() {
+          resolve: function () {
             return 'works';
           }
         }
@@ -69,21 +70,25 @@ function buildSchema(iterator: any, filterFn: FilterFn = defaultFilter) {
 }
 
 describe('GraphQL-JS asyncIterator', () => {
+  const subscribeOptions = {
+    queue: {
+      options: {
+        exclusive: true,
+        durable: false,
+        autoDelete: true
+      }
+    }
+  };
 
   before(async () => {
     config = {
-      connection: await amqp.connect('amqp://guest:guest@localhost:5672?heartbeat=30'),
+      connection: await amqp.connect(
+        'amqp://guest:guest@localhost:5672?heartbeat=30'
+      ),
       exchange: {
         name: 'exchange',
         type: 'topic',
         options: {
-          durable: false,
-          autoDelete: true
-        }
-      },
-      queue: {
-        options: {
-          exclusive: true,
           durable: false,
           autoDelete: true
         }
@@ -103,15 +108,21 @@ describe('GraphQL-JS asyncIterator', () => {
       }
     `);
     const pubsub = new PubSub(config);
-    const origIterator = pubsub.asyncIterator(FIRST_EVENT);
+    const origIterator = pubsub.asyncIterator(FIRST_EVENT, {
+      ...subscribeOptions,
+      queue: { ...subscribeOptions.queue, name: uuidv4() }
+    });
     const schema = buildSchema(origIterator);
 
-    const results = await subscribe(schema, query) as AsyncIterator<ExecutionResult>;
+    const results = (await subscribe(
+      schema,
+      query
+    )) as AsyncIterator<ExecutionResult>;
     const payload1 = results.next();
 
     expect(isAsyncIterable(results)).to.be.true;
 
-    const r = payload1.then(res => {
+    const r = payload1.then((res) => {
       expect(res.value.data!.testSubscription).to.equal('FIRST_EVENT');
     });
 
@@ -129,15 +140,21 @@ describe('GraphQL-JS asyncIterator', () => {
       }
     `);
     const pubsub = new PubSub(config);
-    const origIterator = pubsub.asyncIterator(FIRST_EVENT);
+    const origIterator = pubsub.asyncIterator(FIRST_EVENT, {
+      ...subscribeOptions,
+      queue: { ...subscribeOptions.queue, name: uuidv4() }
+    });
     const schema = buildSchema(origIterator, () => Promise.resolve(true));
 
-    const results = await subscribe(schema, query) as AsyncIterator<ExecutionResult>;
+    const results = (await subscribe(
+      schema,
+      query
+    )) as AsyncIterator<ExecutionResult>;
     const payload1 = results.next();
 
     expect(isAsyncIterable(results)).to.be.true;
 
-    const r = payload1.then(res => {
+    const r = payload1.then((res) => {
       expect(res.value.data!.testSubscription).to.equal('FIRST_EVENT');
     });
 
@@ -156,7 +173,10 @@ describe('GraphQL-JS asyncIterator', () => {
     `);
 
     const pubsub = new PubSub(config);
-    const origIterator = pubsub.asyncIterator(FIRST_EVENT);
+    const origIterator = pubsub.asyncIterator(FIRST_EVENT, {
+      ...subscribeOptions,
+      queue: { ...subscribeOptions.queue, name: uuidv4() }
+    });
 
     let counter = 0;
 
@@ -174,21 +194,23 @@ describe('GraphQL-JS asyncIterator', () => {
 
     const schema = buildSchema(origIterator, filterFn);
 
-    Promise.resolve(subscribe(schema, query)).then((results: AsyncIterator<ExecutionResult> | ExecutionResult) => {
-      expect(isAsyncIterable(results)).to.be.true;
-      results = <AsyncIterator<ExecutionResult>>results;
+    Promise.resolve(subscribe(schema, query)).then(
+      (results: AsyncIterator<ExecutionResult> | ExecutionResult) => {
+        expect(isAsyncIterable(results)).to.be.true;
+        results = <AsyncIterator<ExecutionResult>>results;
 
-      results.next();
-      results.return!();
+        results.next();
+        results.return!();
 
-      setTimeout(() => {
-        pubsub.publish(FIRST_EVENT, {});
-      }, 100);
+        setTimeout(() => {
+          pubsub.publish(FIRST_EVENT, {});
+        }, 100);
 
-      setTimeout(_ => {
-        done();
-      }, 500);
-    });
+        setTimeout((_) => {
+          done();
+        }, 500);
+      }
+    );
   });
 
   it('should clear event handlers', async () => {
@@ -199,11 +221,17 @@ describe('GraphQL-JS asyncIterator', () => {
     `);
 
     const pubsub = new PubSub(config);
-    const origIterator = pubsub.asyncIterator(FIRST_EVENT);
+    const origIterator = pubsub.asyncIterator(FIRST_EVENT, {
+      ...subscribeOptions,
+      queue: { ...subscribeOptions.queue, name: uuidv4() }
+    });
     const returnSpy = spy(origIterator, 'return');
     const schema = buildSchema(origIterator);
 
-    const results = await subscribe(schema, query) as AsyncIterator<ExecutionResult>;
+    const results = (await subscribe(
+      schema,
+      query
+    )) as AsyncIterator<ExecutionResult>;
     const end = results.return!();
 
     const r = end.then(() => {
@@ -214,5 +242,4 @@ describe('GraphQL-JS asyncIterator', () => {
 
     return r;
   });
-
 });

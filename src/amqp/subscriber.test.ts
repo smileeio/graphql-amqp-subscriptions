@@ -1,20 +1,21 @@
 /* tslint:disable:no-unused-expression */
 import { AMQPSubscriber } from './subscriber';
 import { AMQPPublisher } from './publisher';
-import { PubSubAMQPConfig } from './interfaces';
+import { PubSubAMQPConfig, SubscribeOptions } from './interfaces';
 import { Common } from './common';
 import { expect } from 'chai';
+import { v4 as uuidv4 } from 'uuid';
 import 'mocha';
 import Debug from 'debug';
 import amqp from 'amqplib';
 import { EventEmitter } from 'events';
 
 type TestData = {
-  routingKey: string,
+  routingKey: string;
   content: {
-    test: string
-  },
-  message: amqp.ConsumeMessage
+    test: string;
+  };
+  message: amqp.ConsumeMessage;
 };
 
 const logger = Debug('AMQPPubSub');
@@ -23,22 +24,26 @@ let subscriber: AMQPSubscriber;
 let publisher: AMQPPublisher;
 let config: PubSubAMQPConfig;
 
-describe('AMQP Subscriber', () => {
+const subscribeOptions = {
+  queue: {
+    options: {
+      exclusive: true,
+      durable: false,
+      autoDelete: true
+    }
+  }
+};
 
+describe('AMQP Subscriber', () => {
   before(async () => {
     config = {
-      connection: await amqp.connect('amqp://guest:guest@localhost:5672?heartbeat=30'),
+      connection: await amqp.connect(
+        'amqp://guest:guest@localhost:5672?heartbeat=30'
+      ),
       exchange: {
         name: 'exchange',
         type: 'topic',
         options: {
-          durable: false,
-          autoDelete: true
-        }
-      },
-      queue: {
-        options: {
-          exclusive: true,
           durable: false,
           autoDelete: true
         }
@@ -51,7 +56,10 @@ describe('AMQP Subscriber', () => {
   });
 
   it('should create new instance of AMQPSubscriber class with connection only', () => {
-    const simpleSubscriber = new AMQPSubscriber({ connection: config.connection }, logger);
+    const simpleSubscriber = new AMQPSubscriber(
+      { connection: config.connection },
+      logger
+    );
     expect(simpleSubscriber).to.exist;
   });
 
@@ -67,14 +75,23 @@ describe('AMQP Subscriber', () => {
 
   it('should be able to receive a message through an exchange', async () => {
     const emitter = new EventEmitter();
-    const msgPromise = new Promise<TestData>((resolve) => { emitter.once('message', resolve); });
-
-    const dispose = await subscriber.subscribe('*.test', (routingKey, content) => {
-      emitter.emit('message', { routingKey, content });
+    const msgPromise = new Promise<TestData>((resolve) => {
+      emitter.once('message', resolve);
     });
+
+    const dispose = await subscriber.subscribe(
+      '*.test',
+      (routingKey, content) => {
+        emitter.emit('message', { routingKey, content });
+      },
+      {
+        ...subscribeOptions,
+        queue: { ...subscribeOptions.queue, name: uuidv4() }
+      }
+    );
     expect(dispose).to.exist;
 
-    await publisher.publish('test.test', {test: 'data'});
+    await publisher.publish('test.test', { test: 'data' });
     const { routingKey: key, content: msg } = await msgPromise;
 
     expect(key).to.exist;
@@ -87,14 +104,27 @@ describe('AMQP Subscriber', () => {
 
   it('should be able to receive a message through an exchange with header information', async () => {
     const emitter = new EventEmitter();
-    const msgPromise = new Promise<TestData>((resolve) => { emitter.once('message', resolve); });
-
-    const dispose = await subscriber.subscribe('*.test', (routingKey, content, message) => {
-      emitter.emit('message', { routingKey, content, message });
+    const msgPromise = new Promise<TestData>((resolve) => {
+      emitter.once('message', resolve);
     });
+
+    const dispose = await subscriber.subscribe(
+      '*.test',
+      (routingKey, content, message) => {
+        emitter.emit('message', { routingKey, content, message });
+      },
+      {
+        ...subscribeOptions,
+        queue: { ...subscribeOptions.queue, name: uuidv4() }
+      }
+    );
     expect(dispose).to.exist;
 
-    await publisher.publish('test.test', {test: 'data'}, { contentType: 'file', headers: { key: 'value' }});
+    await publisher.publish(
+      'test.test',
+      { test: 'data' },
+      { contentType: 'file', headers: { key: 'value' } }
+    );
     const { routingKey: key, content: msg, message: rawMsg } = await msgPromise;
 
     expect(key).to.exist;
@@ -118,16 +148,21 @@ describe('AMQP Subscriber', () => {
 
   it('should be able to unsubscribe', async () => {
     const emitter = new EventEmitter();
-    const errPromise = new Promise((_resolve, reject) => { emitter.once('error', reject); });
-
-    const dispose = await subscriber.subscribe('test.test', () => {
-      emitter.emit('error', new Error('Should not reach'));
+    const errPromise = new Promise((_resolve, reject) => {
+      emitter.once('error', reject);
     });
 
-    return Promise.race([
-      dispose,
-      errPromise
-    ]);
-  });
+    const dispose = await subscriber.subscribe(
+      'test.test',
+      () => {
+        emitter.emit('error', new Error('Should not reach'));
+      },
+      {
+        ...subscribeOptions,
+        queue: { ...subscribeOptions.queue, name: uuidv4() }
+      }
+    );
 
+    return Promise.race([dispose, errPromise]);
+  });
 });

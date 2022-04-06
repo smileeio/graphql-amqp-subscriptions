@@ -38,9 +38,9 @@ export class PubSubAsyncIterator<T> implements AsyncIterator<T> {
   private allSubscribed: Promise<number[]>;
   private listening: boolean;
   private pubsub: AMQPPubSubEngine;
-  private options?: SubscribeOptions;
+  private options: SubscribeOptions;
 
-  constructor(pubsub: AMQPPubSubEngine, eventNames: string | string[], options?: SubscribeOptions) {
+  constructor(pubsub: AMQPPubSubEngine, eventNames: string | string[], options: SubscribeOptions) {
     this.options = options;
     this.pubsub = pubsub;
     this.pullQueue = [];
@@ -109,7 +109,7 @@ export class PubSubAsyncIterator<T> implements AsyncIterator<T> {
 
   private unsubscribeAll(subscriptionIds: number[]) {
     for (const subscriptionId of subscriptionIds) {
-      this.pubsub.unsubscribe(subscriptionId);
+      this.pubsub.unsubscribe(subscriptionId, this.options.queue.name);
     }
   }
 
