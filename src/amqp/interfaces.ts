@@ -31,6 +31,6 @@ export interface SubscribeOptions {
 export declare abstract class AMQPPubSubEngine {
   public abstract publish(triggerName: string, payload: any): Promise<void>;
   public abstract subscribe(triggerName: string, onMessage: Function, options: SubscribeOptions): Promise<number>;
-  public abstract unsubscribe(subId: number, queueId?: string): any;
+  public abstract unsubscribe(subId: number, queueName: string): any;
   public asyncIterator<T>(triggers: string | string[], options: SubscribeOptions): AsyncIterator<T>;
 }
