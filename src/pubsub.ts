@@ -4,7 +4,12 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { AMQPPublisher } from './amqp/publisher';
 import { AMQPSubscriber } from './amqp/subscriber';
-import { AMQPPubSubEngine, Exchange, PubSubAMQPConfig, SubscribeOptions } from './amqp/interfaces';
+import {
+  AMQPPubSubEngine,
+  Exchange,
+  PubSubAMQPConfig,
+  SubscribeOptions
+} from './amqp/interfaces';
 import { PubSubAsyncIterator } from './pubsub-async-iterator';
 
 const logger = Debug('AMQPPubSub');
@@ -14,14 +19,18 @@ export class AMQPPubSub implements AMQPPubSubEngine {
   private subscriber: AMQPSubscriber;
   private exchange: Exchange;
 
-  private subscriptionMap: { [subId: number]: { routingKey: string, listener: Function } };
-  private subsRefsMap: { [queueName: string]: { [trigger: string]: Array<number> } };
-  private unsubscribeMap: { [queueName: string]: { [trigger: string]: () => PromiseLike<any> } };
+  private subscriptionMap: {
+    [subId: number]: { routingKey: string; listener: Function };
+  };
+  private subsRefsMap: {
+    [queueName: string]: { [trigger: string]: Array<number> };
+  };
+  private unsubscribeMap: {
+    [queueName: string]: { [trigger: string]: () => PromiseLike<any> };
+  };
   private currentSubscriptionId: number;
 
-  constructor(
-    config: PubSubAMQPConfig
-  ) {
+  constructor(config: PubSubAMQPConfig) {
     this.subscriptionMap = {};
     this.subsRefsMap = {};
     this.unsubscribeMap = {};
@@ -44,9 +53,28 @@ export class AMQPPubSub implements AMQPPubSubEngine {
     logger('Finished initializing');
   }
 
-  public async publish(routingKey: string, payload: any, options?: amqp.Options.Publish): Promise<void> {
-    logger('Publishing message to exchange "%s" for key "%s" (%j)', this.exchange.name, routingKey, payload);
+  public async publish(
+    routingKey: string,
+    payload: any,
+    options?: amqp.Options.Publish
+  ): Promise<void> {
+    logger(
+      'Publishing message to exchange "%s" for key "%s" (%j)',
+      this.exchange.name,
+      routingKey,
+      payload
+    );
     return this.publisher.publish(routingKey, payload, options);
+  }
+
+  /**
+   * @smileeio only for tests
+   */
+  public async waitForConnect() {
+    return Promise.all([
+      this.subscriber.waitForConnect(),
+      this.publisher.waitForConnect()
+    ]);
   }
 
   public async subscribe(
@@ -70,12 +98,16 @@ export class AMQPPubSub implements AMQPPubSubEngine {
     const refs = this.subsRefsMap[queueName]?.[routingKey];
     if (refs && refs.length > 0) {
       const newRefs = [...refs, id];
-      if (!this.subsRefsMap[queueName]) { this.subsRefsMap[queueName] = {}; }
+      if (!this.subsRefsMap[queueName]) {
+        this.subsRefsMap[queueName] = {};
+      }
       this.subsRefsMap[queueName][routingKey] = newRefs;
       return id;
     }
 
-    if (!this.subsRefsMap[queueName]) { this.subsRefsMap[queueName] = {}; }
+    if (!this.subsRefsMap[queueName]) {
+      this.subsRefsMap[queueName] = {};
+    }
     this.subsRefsMap[queueName][routingKey] = [
       ...(this.subsRefsMap[queueName][routingKey] || []),
       id
@@ -84,11 +116,17 @@ export class AMQPPubSub implements AMQPPubSubEngine {
     const existingDispose = this.unsubscribeMap[queueName]?.[routingKey];
     // Get rid of exisiting subscription while we get a new one.
     const [newDispose] = await Promise.all([
-      this.subscriber.subscribe(routingKey, this.onMessage.bind(this, queueName), options),
+      this.subscriber.subscribe(
+        routingKey,
+        this.onMessage.bind(this, queueName),
+        options
+      ),
       existingDispose ? existingDispose() : Promise.resolve()
     ]);
 
-    if (!this.unsubscribeMap[queueName]) { this.unsubscribeMap[queueName] = {}; }
+    if (!this.unsubscribeMap[queueName]) {
+      this.unsubscribeMap[queueName] = {};
+    }
     this.unsubscribeMap[queueName][routingKey] = newDispose;
     return id;
   }
@@ -102,7 +140,9 @@ export class AMQPPubSub implements AMQPPubSubEngine {
 
     const refs = this.subsRefsMap[queueName]?.[routingKey];
     if (!refs) {
-      throw new Error(`There is no subscription ref for routing key "${routingKey}", id "${subId}"`);
+      throw new Error(
+        `There is no subscription ref for routing key "${routingKey}", id "${subId}"`
+      );
     }
     logger('Unsubscribing from "%s" with id: "%s"', routingKey, subId);
 
@@ -113,25 +153,34 @@ export class AMQPPubSub implements AMQPPubSubEngine {
 
     const index = refs.indexOf(subId);
     const newRefs =
-      index === -1
-        ? refs
-        : [...refs.slice(0, index), ...refs.slice(index + 1)];
+      index === -1 ? refs : [...refs.slice(0, index), ...refs.slice(index + 1)];
     this.subsRefsMap[queueName][routingKey] = newRefs;
     delete this.subscriptionMap[subId];
   }
 
-  public asyncIterator<T>(triggers: string | string[], options: SubscribeOptions): AsyncIterator<T> {
+  public asyncIterator<T>(
+    triggers: string | string[],
+    options: SubscribeOptions
+  ): AsyncIterator<T> {
     return new PubSubAsyncIterator<T>(this, triggers, options);
   }
 
-  private onMessage = (queueName: string, routingKey: string, content: any, message: amqp.ConsumeMessage | null): void => {
+  private onMessage = (
+    queueName: string,
+    routingKey: string,
+    content: any,
+    message: amqp.ConsumeMessage | null
+  ): void => {
     const subscribers = this.subsRefsMap[queueName]?.[routingKey];
 
     // Don't work for nothing...
     if (!subscribers || !subscribers.length) {
-      this.unsubscribeForKey(queueName, routingKey)
-      .catch((err) => {
-        logger('onMessage unsubscribeForKey error "%j", Routing Key "%s"', err, routingKey);
+      this.unsubscribeForKey(queueName, routingKey).catch((err) => {
+        logger(
+          'onMessage unsubscribeForKey error "%j", Routing Key "%s"',
+          err,
+          routingKey
+        );
       });
       return;
     }
@@ -141,14 +190,20 @@ export class AMQPPubSub implements AMQPPubSubEngine {
     }
   }
 
-  private async unsubscribeForKey(queueName: string, routingKey: string): Promise<void> {
-    if (!this.unsubscribeMap[queueName]) { return; }
-    if (!this.unsubscribeMap[queueName][routingKey]) { return; }
+  private async unsubscribeForKey(
+    queueName: string,
+    routingKey: string
+  ): Promise<void> {
+    if (!this.unsubscribeMap[queueName]) {
+      return;
+    }
+    if (!this.unsubscribeMap[queueName][routingKey]) {
+      return;
+    }
 
     const dispose = this.unsubscribeMap[queueName][routingKey];
     delete this.unsubscribeMap[queueName][routingKey];
     delete this.subsRefsMap[queueName][routingKey];
     await dispose();
   }
-
 }

@@ -4,7 +4,8 @@ import { PubSubAMQPConfig } from './amqp/interfaces';
 import { expect } from 'chai';
 import { v4 as uuidv4 } from 'uuid';
 import 'mocha';
-import amqp from 'amqplib';
+import amqp from 'amqp-connection-manager';
+import type { ConsumeMessage } from 'amqplib';
 import { EventEmitter } from 'events';
 
 type TestData = { test: string };
@@ -12,7 +13,7 @@ type TestDataDetail = {
   content: {
     test: string;
   };
-  message: amqp.ConsumeMessage;
+  message: ConsumeMessage;
 };
 
 let pubsub: AMQPPubSub;
@@ -31,7 +32,7 @@ const subscribeOptions = {
 describe('AMQP PubSub', () => {
   before(async () => {
     config = {
-      connection: await amqp.connect(
+      connection: amqp.connect(
         'amqp://guest:guest@localhost:5672?heartbeat=30'
       ),
       exchange: {
@@ -81,6 +82,8 @@ describe('AMQP PubSub', () => {
     expect(subscriberId).to.exist;
     expect(isNaN(subscriberId)).to.equal(false);
 
+    await pubsub.waitForConnect();
+
     await pubsub.publish('testx.test', { test: 'data' });
     const msg = await msgPromise;
 
@@ -106,6 +109,8 @@ describe('AMQP PubSub', () => {
     );
     expect(subscriberId).to.exist;
     expect(isNaN(subscriberId)).to.equal(false);
+
+    await pubsub.waitForConnect();
 
     await pubsub.publish(
       'testheader.test',
@@ -188,6 +193,8 @@ describe('AMQP PubSub', () => {
     expect(id2).to.exist;
     expect(id1).to.not.equal(id2);
 
+    await pubsub.waitForConnect();
+
     // Unsubscribe one
     await pubsub.unsubscribe(id1, options.queue.name);
 
@@ -234,6 +241,8 @@ describe('AMQP PubSub', () => {
     expect(id1).to.exist;
     expect(id2).to.exist;
     expect(id1).to.not.equal(id2);
+
+    await pubsub.waitForConnect();
 
     // Unsubscribe one
     await pubsub.unsubscribe(id1, options.queue.name);
@@ -285,6 +294,8 @@ describe('AMQP PubSub', () => {
 
     expect(id2).to.exist;
     expect(id1).to.not.equal(id2);
+
+    await pubsub.waitForConnect();
 
     await pubsub.publish('testy.test', { test: '1337' });
     const msg = await Promise.race<TestData>([msgPromise, errPromise]);

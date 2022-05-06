@@ -1,13 +1,14 @@
 /* tslint:disable:no-unused-expression */
 import { AMQPSubscriber } from './subscriber';
 import { AMQPPublisher } from './publisher';
-import { PubSubAMQPConfig, SubscribeOptions } from './interfaces';
+import { PubSubAMQPConfig } from './interfaces';
 import { Common } from './common';
 import { expect } from 'chai';
 import { v4 as uuidv4 } from 'uuid';
 import 'mocha';
 import Debug from 'debug';
-import amqp from 'amqplib';
+import amqp from 'amqp-connection-manager';
+import type { ConsumeMessage } from 'amqplib';
 import { EventEmitter } from 'events';
 
 type TestData = {
@@ -15,7 +16,7 @@ type TestData = {
   content: {
     test: string;
   };
-  message: amqp.ConsumeMessage;
+  message: ConsumeMessage;
 };
 
 const logger = Debug('AMQPPubSub');
@@ -37,7 +38,7 @@ const subscribeOptions = {
 describe('AMQP Subscriber', () => {
   before(async () => {
     config = {
-      connection: await amqp.connect(
+      connection: amqp.connect(
         'amqp://guest:guest@localhost:5672?heartbeat=30'
       ),
       exchange: {
@@ -49,6 +50,9 @@ describe('AMQP Subscriber', () => {
         }
       }
     };
+    await new Promise<void>((resolve) =>
+      config.connection.once('connect', () => resolve())
+    );
   });
 
   after(async () => {
@@ -89,7 +93,10 @@ describe('AMQP Subscriber', () => {
         queue: { ...subscribeOptions.queue, name: uuidv4() }
       }
     );
+
     expect(dispose).to.exist;
+
+    await subscriber.waitForConnect();
 
     await publisher.publish('test.test', { test: 'data' });
     const { routingKey: key, content: msg } = await msgPromise;
@@ -119,6 +126,8 @@ describe('AMQP Subscriber', () => {
       }
     );
     expect(dispose).to.exist;
+
+    await subscriber.waitForConnect();
 
     await publisher.publish(
       'test.test',

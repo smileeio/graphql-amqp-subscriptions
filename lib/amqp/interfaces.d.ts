@@ -1,4 +1,4 @@
-import { Options, Connection } from 'amqplib';
+import type { AmqpConnectionManager, Options } from 'amqp-connection-manager';
 export interface Exchange {
     name: string;
     type: string;
@@ -11,7 +11,7 @@ export interface Queue {
     deleteOnDispose?: boolean;
 }
 export interface PubSubAMQPConfig {
-    connection: Connection;
+    connection: AmqpConnectionManager;
     exchange?: Exchange;
     queue?: Queue;
 }

@@ -1,4 +1,4 @@
-import {Options, Connection} from 'amqplib';
+import type { AmqpConnectionManager, Options } from 'amqp-connection-manager';
 
 export interface Exchange {
   name: string;
@@ -14,7 +14,7 @@ export interface Queue {
 }
 
 export interface PubSubAMQPConfig {
-  connection: Connection;
+  connection: AmqpConnectionManager;
   exchange?: Exchange;
   queue?: Queue;
 }
@@ -30,7 +30,14 @@ export interface SubscribeOptions {
 
 export declare abstract class AMQPPubSubEngine {
   public abstract publish(triggerName: string, payload: any): Promise<void>;
-  public abstract subscribe(triggerName: string, onMessage: Function, options: SubscribeOptions): Promise<number>;
+  public abstract subscribe(
+    triggerName: string,
+    onMessage: Function,
+    options: SubscribeOptions
+  ): Promise<number>;
   public abstract unsubscribe(subId: number, queueName: string): any;
-  public asyncIterator<T>(triggers: string | string[], options: SubscribeOptions): AsyncIterator<T>;
+  public asyncIterator<T>(
+    triggers: string | string[],
+    options: SubscribeOptions
+  ): AsyncIterator<T>;
 }

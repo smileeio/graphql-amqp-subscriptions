@@ -1,18 +1,19 @@
-import amqp from 'amqplib';
+import type {
+  AmqpConnectionManager,
+  ChannelWrapper,
+  Options
+} from 'amqp-connection-manager';
+import type { Channel } from 'amqplib';
 import Debug from 'debug';
-import * as BluebirdPromise from 'bluebird';
 
 import { PubSubAMQPConfig, Exchange } from './interfaces';
 
 export class AMQPPublisher {
-  private connection: amqp.Connection;
+  private connection: AmqpConnectionManager;
   private exchange: Exchange;
-  private channel: BluebirdPromise<amqp.Channel> | null = null;
+  private channel: ChannelWrapper | null = null;
 
-  constructor(
-    config: PubSubAMQPConfig,
-    private logger: Debug.IDebugger
-  ) {
+  constructor(config: PubSubAMQPConfig, private logger: Debug.IDebugger) {
     this.connection = config.connection;
     this.exchange = {
       name: 'graphql_subscriptions',
@@ -25,20 +26,52 @@ export class AMQPPublisher {
     };
   }
 
-  public async publish(routingKey: string, data: any, options?: amqp.Options.Publish): Promise<void> {
+  public async publish(
+    routingKey: string,
+    data: any,
+    options?: Options.Publish
+  ): Promise<void> {
     const channel = await this.getOrCreateChannel();
-    await channel.assertExchange(this.exchange.name, this.exchange.type, this.exchange.options);
-    channel.publish(this.exchange.name, routingKey, Buffer.from(JSON.stringify(data)), options);
-    this.logger('Message sent to Exchange "%s" with Routing Key "%s" (%j)', this.exchange.name, routingKey, data);
+
+    function setup(this: AMQPPublisher, ch: Channel) {
+      return ch.assertExchange(
+        this.exchange.name,
+        this.exchange.type,
+        this.exchange.options
+      );
+    }
+
+    await channel.addSetup(setup.bind(this));
+
+    await channel.publish(
+      this.exchange.name,
+      routingKey,
+      Buffer.from(JSON.stringify(data)),
+      options
+    );
+
+    this.logger(
+      'Message sent to Exchange "%s" with Routing Key "%s" (%j)',
+      this.exchange.name,
+      routingKey,
+      data
+    );
   }
 
-  private async getOrCreateChannel(): Promise<amqp.Channel> {
+  /**
+   * @smileeio only for tests
+   */
+  public async waitForConnect() {
+    const channel = await this.getOrCreateChannel();
+    return channel.waitForConnect();
+  }
+
+  private getOrCreateChannel(): ChannelWrapper {
     if (!this.channel) {
       this.channel = this.connection.createChannel();
-      this.channel.then(ch => {
-        ch.on('error', (err) => { this.logger('Publisher channel error: "%j"', err); });
-        /* tslint:disable */
-      }).catch(() => {});
+      this.channel.on('error', (err) =>
+        this.logger('Publisher channel error: "%j"', err)
+      );
     }
     return this.channel;
   }

@@ -11,7 +11,7 @@ import { AMQPPubSub as PubSub } from './pubsub';
 import { withFilter, FilterFn } from 'graphql-subscriptions';
 import { ExecutionResult } from 'graphql';
 import { PubSubAMQPConfig } from './amqp/interfaces';
-import amqp from 'amqplib';
+import amqp from 'amqp-connection-manager';
 
 chai.use(chaiAsPromised);
 chai.use(sinonChai);
@@ -82,7 +82,7 @@ describe('GraphQL-JS asyncIterator', () => {
 
   before(async () => {
     config = {
-      connection: await amqp.connect(
+      connection: amqp.connect(
         'amqp://guest:guest@localhost:5672?heartbeat=30'
       ),
       exchange: {
