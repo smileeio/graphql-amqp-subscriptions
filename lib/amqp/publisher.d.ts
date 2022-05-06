@@ -8,5 +8,9 @@ export declare class AMQPPublisher {
     private channel;
     constructor(config: PubSubAMQPConfig, logger: Debug.IDebugger);
     publish(routingKey: string, data: any, options?: Options.Publish): Promise<void>;
+    /**
+     * @smileeio only for tests
+     */
+    waitForConnect(): Promise<void>;
     private getOrCreateChannel;
 }
