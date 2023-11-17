@@ -7,7 +7,7 @@ export declare class AMQPSubscriber {
     private exchange;
     private channel;
     constructor(config: PubSubAMQPConfig, logger: Debug.IDebugger);
-    subscribe(routingKey: string, action: (routingKey: string, content: any, message: ConsumeMessage | null) => void, options: SubscribeOptions): Promise<() => Promise<void>>;
+    subscribe(routingKey: string, action: (routingKey: string, content: any, message: ConsumeMessage | null) => void | Promise<void>, options: SubscribeOptions): Promise<() => Promise<void>>;
     /**
      * @smileeio only for tests
      */
