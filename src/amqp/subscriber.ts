@@ -32,7 +32,7 @@ export class AMQPSubscriber {
       routingKey: string,
       content: any,
       message: ConsumeMessage | null
-    ) => void,
+    ) => void | Promise<void>,
     options: SubscribeOptions
   ): Promise<() => Promise<void>> {
     let teardownChannel: undefined | ((ch: Channel) => Promise<void>);
@@ -59,14 +59,24 @@ export class AMQPSubscriber {
 
       const opts = await ch.consume(
         queue.queue,
-        (msg) => {
-          let content = Common.convertMessage(msg);
+        async (msg) => {
+          const content = Common.convertMessage(msg);
           this.logger(
             'Message arrived from Queue "%s" (%j)',
             queue.queue,
             content
           );
-          action(routingKey, content, msg);
+
+            await action(routingKey, content, msg);
+            /**
+             * TLDR: noAck=false means the message is processed again
+             *       when the message handler throws an error.
+             *
+             * https://amqp-node.github.io/amqplib/channel_api.html#:~:text=Defaults%20to%20false.-,noAck,-(boolean)%3A%20if%20true
+             */
+            if (options?.consume?.noAck === false) {
+              ch.ack(msg!);
+            }
         },
         { noAck: true, ...((options && options.consume) || {}) }
       );

@@ -114,10 +114,10 @@ describe('GraphQL-JS asyncIterator', () => {
     });
     const schema = buildSchema(origIterator);
 
-    const results = (await subscribe(
+    const results = (await subscribe({
       schema,
-      query
-    )) as AsyncIterator<ExecutionResult>;
+      document: query
+    })) as AsyncIterator<ExecutionResult>;
     const payload1 = results.next();
 
     expect(isAsyncIterable(results)).to.be.true;
@@ -146,10 +146,10 @@ describe('GraphQL-JS asyncIterator', () => {
     });
     const schema = buildSchema(origIterator, () => Promise.resolve(true));
 
-    const results = (await subscribe(
+    const results = (await subscribe({
       schema,
-      query
-    )) as AsyncIterator<ExecutionResult>;
+      document: query
+    })) as AsyncIterator<ExecutionResult>;
     const payload1 = results.next();
 
     expect(isAsyncIterable(results)).to.be.true;
@@ -194,7 +194,10 @@ describe('GraphQL-JS asyncIterator', () => {
 
     const schema = buildSchema(origIterator, filterFn);
 
-    Promise.resolve(subscribe(schema, query)).then(
+    Promise.resolve(subscribe({
+      schema,
+      document: query
+    })).then(
       (results: AsyncIterator<ExecutionResult> | ExecutionResult) => {
         expect(isAsyncIterable(results)).to.be.true;
         results = <AsyncIterator<ExecutionResult>>results;
@@ -228,10 +231,10 @@ describe('GraphQL-JS asyncIterator', () => {
     const returnSpy = spy(origIterator, 'return');
     const schema = buildSchema(origIterator);
 
-    const results = (await subscribe(
+    const results = (await subscribe({
       schema,
-      query
-    )) as AsyncIterator<ExecutionResult>;
+      document: query
+    })) as AsyncIterator<ExecutionResult>;
     const end = results.return!();
 
     const r = end.then(() => {

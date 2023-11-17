@@ -6,6 +6,7 @@ import { Common } from './common';
 import { expect } from 'chai';
 import { v4 as uuidv4 } from 'uuid';
 import 'mocha';
+import sinon from 'sinon';
 import Debug from 'debug';
 import amqp from 'amqp-connection-manager';
 import type { ConsumeMessage } from 'amqplib';
@@ -54,6 +55,8 @@ describe('AMQP Subscriber', () => {
       config.connection.once('connect', () => resolve())
     );
   });
+
+  beforeEach(() => sinon.restore());
 
   after(async () => {
     return config.connection.close();
@@ -151,6 +154,91 @@ describe('AMQP Subscriber', () => {
     expect(rawMsg.properties.headers).to.exist;
     expect(rawMsg.properties.headers.key).to.exist;
     expect(rawMsg.properties.headers.key).to.equal('value');
+
+    return dispose();
+  });
+
+  it('should acknowledge message after successfully handling message, when noAck consume option is false', async () => {
+    const emitter = new EventEmitter();
+
+    const msgPromise = new Promise<TestData>((resolve) => {
+      emitter.once('message', resolve);
+    });
+
+    const dispose = await subscriber.subscribe(
+      '*.test',
+      (routingKey, content) => {
+        emitter.emit('message', { routingKey, content });
+      },
+      {
+        ...subscribeOptions,
+        queue: { ...subscribeOptions.queue, name: uuidv4() },
+        consume: { noAck: false }
+      }
+    );
+
+    expect(dispose).to.exist;
+
+    await subscriber.waitForConnect();
+
+    const  conn = (config.connection as any);
+    expect(conn._channels).to.have.length.greaterThan(0);
+    const channel = conn._channels[0]._channel;
+
+    const ackSpy = sinon.spy(channel, 'ack');
+
+    await publisher.publish('test.test', { test: 'data' });
+    const { routingKey: key, content: msg } = await msgPromise;
+
+    expect(key).to.exist;
+    expect(msg).to.exist;
+    expect(msg.test).to.exist;
+    expect(msg.test).to.equal('data');
+
+    expect(ackSpy).to.have.been.calledOnce;
+
+    return dispose();
+  });
+
+  it('should fail to acknowledge message after failing to handle message, when noAck consume option is false', async () => {
+    const emitter = new EventEmitter();
+
+    const msgPromise = new Promise<TestData>((resolve) => {
+      emitter.once('message', resolve);
+    });
+
+    const dispose = await subscriber.subscribe(
+      '*.test',
+      (routingKey, content) => {
+        emitter.emit('message', { routingKey, content });
+        throw new Error('mock error');
+      },
+      {
+        ...subscribeOptions,
+        queue: { ...subscribeOptions.queue, name: uuidv4() },
+        consume: { noAck: false }
+      }
+    );
+
+    expect(dispose).to.exist;
+
+    await subscriber.waitForConnect();
+
+    const  conn = (config.connection as any);
+    expect(conn._channels).to.have.length.greaterThan(0);
+    const channel = conn._channels[0]._channel;
+
+    const ackSpy = sinon.spy(channel, 'ack');
+
+    await publisher.publish('test.test', { test: 'data' });
+    const { routingKey: key, content: msg } = await msgPromise;
+
+    expect(key).to.exist;
+    expect(msg).to.exist;
+    expect(msg.test).to.exist;
+    expect(msg.test).to.equal('data');
+
+    expect(ackSpy).not.to.have.been.called;
 
     return dispose();
   });

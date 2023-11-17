@@ -11,7 +11,8 @@ describe('Common', () => {
         deliveryTag: 1,
         redelivered: false,
         exchange: 'exchange',
-        routingKey: 'test.test'
+        routingKey: 'test.test',
+        consumerTag: 'amq.ctag-8fh8328b88FQf2fedw1d21'
       },
       properties: {
         contentType: undefined,
@@ -41,7 +42,8 @@ describe('Common', () => {
         deliveryTag: 1,
         redelivered: false,
         exchange: 'exchange',
-        routingKey: 'test.test'
+        routingKey: 'test.test',
+        consumerTag: 'amq.ctag-onifewNF432nofdaASF212'
       },
       properties: {
         contentType: undefined,
