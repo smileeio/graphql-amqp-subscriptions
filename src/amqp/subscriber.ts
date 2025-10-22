@@ -41,21 +41,8 @@ export class AMQPSubscriber {
     const channel = await this.getOrCreateChannel();
 
     async function setupChannel(this: AMQPSubscriber, ch: Channel) {
-      await ch.assertExchange(
-        this.exchange.name,
-        this.exchange.type,
-        this.exchange.options
-      );
-      const queue = await ch.assertQueue(
-        options.queue.name || '',
-        options.queue.options
-      );
-      await ch.bindQueue(
-        queue.queue,
-        this.exchange.name,
-        routingKey,
-        options.queue.options ? options.queue.options.arguments : undefined
-      );
+      // Use the shared queue setup logic
+      const queue = await this.setupQueueAndBind(ch, routingKey, options);
 
       const opts = await ch.consume(
         queue.queue,
@@ -111,11 +98,67 @@ export class AMQPSubscriber {
   }
 
   /**
+   * Create a queue and bind it to the exchange with a routing key
+   */
+  public async bindQueue(
+    routingKey: string,
+    options: SubscribeOptions
+  ): Promise<string> {
+    const channel = await this.getOrCreateChannel();
+
+    async function setupQueue(this: AMQPSubscriber, ch: Channel) {
+      const queue = await this.setupQueueAndBind(ch, routingKey, options);
+
+      this.logger(
+        'Created and bound Queue "%s" to exchange "%s" with routing key "%s"',
+        queue.queue,
+        this.exchange.name,
+        routingKey
+      );
+
+      return queue.queue;
+    }
+
+    const setup = setupQueue.bind(this);
+    await channel.addSetup(setup);
+    await channel.waitForConnect();
+
+    // Return the queue name (will be auto-generated if not provided)
+    return options.queue.name || '';
+  }
+
+  /**
    * @smileeio only for tests
    */
   public async waitForConnect() {
     const channel = await this.getOrCreateChannel();
     return channel.waitForConnect();
+  }
+
+  /**
+   * Shared logic for setting up and binding a queue
+   */
+  private async setupQueueAndBind(
+    ch: Channel,
+    routingKey: string,
+    options: SubscribeOptions
+  ): Promise<{ queue: string }> {
+    await ch.assertExchange(
+      this.exchange.name,
+      this.exchange.type,
+      this.exchange.options
+    );
+    const queue = await ch.assertQueue(
+      options.queue.name || '',
+      options.queue.options
+    );
+    await ch.bindQueue(
+      queue.queue,
+      this.exchange.name,
+      routingKey,
+      options.queue.options ? options.queue.options.arguments : undefined
+    );
+    return queue;
   }
 
   private getOrCreateChannel(): ChannelWrapper {

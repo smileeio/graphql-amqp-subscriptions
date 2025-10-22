@@ -36,6 +36,10 @@ export declare abstract class AMQPPubSubEngine {
     options: SubscribeOptions
   ): Promise<number>;
   public abstract unsubscribe(subId: number, queueName: string): any;
+  public abstract bindQueue(
+    routingKey: string,
+    options: SubscribeOptions
+  ): Promise<string>;
   public asyncIterator<T>(
     triggers: string | string[],
     options: SubscribeOptions

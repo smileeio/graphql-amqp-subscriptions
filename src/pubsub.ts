@@ -77,6 +77,25 @@ export class AMQPPubSub implements AMQPPubSubEngine {
     ]);
   }
 
+  /**
+   * Create a queue and bind it to the exchange with a routing key.
+   * This allows you to set up the queue before subscribing to it.
+   * @param routingKey The routing key to bind the queue to
+   * @param options The subscription options including queue configuration
+   * @returns The name of the created queue
+   */
+  public async bindQueue(
+    routingKey: string,
+    options: SubscribeOptions
+  ): Promise<string> {
+    logger(
+      'Creating queue "%s" and binding to routing key "%s"',
+      options.queue.name || '(auto-generated)',
+      routingKey
+    );
+    return this.subscriber.bindQueue(routingKey, options);
+  }
+
   public async subscribe(
     routingKey: string | 'fanout',
     onMessage: (content: any, message?: amqp.ConsumeMessage | null) => void,

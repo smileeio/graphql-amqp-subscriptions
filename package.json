@@ -1,7 +1,7 @@
 {
   "name": "@smileeio/graphql-amqp-subscriptions",
   "description": "GraphQL AMQP Subscriptions",
-  "version": "1.2.0-smileeio-v3",
+  "version": "1.2.0-smileeio-v4",
   "author": "https://github.com/Surnet/graphql-amqp-subscriptions/graphs/contributors",
   "license": "MIT",
   "homepage": "https://github.com/smileeio/graphql-amqp-subscriptions",
@@ -55,7 +55,6 @@
     "eslint": "7.26.0",
     "graphql": "16.8.0",
     "mocha": "8.4.0",
-    "mocha-tslint": "0.3.0",
     "nodemon": "2.0.7",
     "nyc": "15.1.0",
     "release-it": "14.6.2",

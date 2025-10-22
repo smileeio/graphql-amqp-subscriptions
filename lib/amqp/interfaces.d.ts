@@ -26,5 +26,6 @@ export declare abstract class AMQPPubSubEngine {
     abstract publish(triggerName: string, payload: any): Promise<void>;
     abstract subscribe(triggerName: string, onMessage: Function, options: SubscribeOptions): Promise<number>;
     abstract unsubscribe(subId: number, queueName: string): any;
+    abstract bindQueue(routingKey: string, options: SubscribeOptions): Promise<string>;
     asyncIterator<T>(triggers: string | string[], options: SubscribeOptions): AsyncIterator<T>;
 }
