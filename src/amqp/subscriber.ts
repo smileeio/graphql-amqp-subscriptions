@@ -6,7 +6,7 @@ import type {
 import Debug from 'debug';
 
 import { Common } from './common';
-import { PubSubAMQPConfig, Exchange, SubscribeOptions } from './interfaces';
+import { PubSubAMQPConfig, Exchange, SubscribeOptions, QueueBindOptions } from './interfaces';
 
 export class AMQPSubscriber {
   private connection: AmqpConnectionManager;
@@ -141,7 +141,7 @@ export class AMQPSubscriber {
   private async setupQueueAndBind(
     ch: Channel,
     routingKey: string,
-    options: SubscribeOptions
+    options: QueueBindOptions
   ): Promise<{ queue: string }> {
     await ch.assertExchange(
       this.exchange.name,

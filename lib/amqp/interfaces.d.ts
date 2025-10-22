@@ -22,6 +22,9 @@ export interface SubscribeOptions {
     queue: SubscribeQueue;
     consume?: Options.Consume;
 }
+export interface QueueBindOptions {
+    queue: SubscribeQueue;
+}
 export declare abstract class AMQPPubSubEngine {
     abstract publish(triggerName: string, payload: any): Promise<void>;
     abstract subscribe(triggerName: string, onMessage: Function, options: SubscribeOptions): Promise<number>;
